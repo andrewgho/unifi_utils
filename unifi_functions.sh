@@ -63,7 +63,7 @@ unifi_login() {
     # Resolve hostname to IP address via default gateway if necessary
     # (for example, if this script runs on a server using a public DNS server)
     local hostport
-    hostport=$(echo "$UNIFI_BASEURL" | sed 's,^https\?://,,; s,^.*\@,,; s,/.*$,,')
+    hostport=$(echo "$UNIFI_BASEURL" | sed 's,^https\{0\,1\}://,,; s,^.*\@,,; s,/.*$,,')
     [ -z "$hostport" ] && warn 'could not extract host:port from URL: $UNIFI_BASEURL' && return 1
     local hostname
     hostname=$(echo "$hostport" | sed 's/:[1-9][0-9]*$//')
@@ -73,6 +73,7 @@ unifi_login() {
     if [ -z "$ip" ]; then
         # Hostname did not resolve locally, ask gateway to resolve it
         local gateway
+        # TODO: macos doesn't ship with ip command, fall back to netstat -rn
         gateway=$(ip route | awk '/^default via/ { print $3 }')
         [ -z "$gateway" ] && warn 'could not determine default gateway' && return 1
         local ip
