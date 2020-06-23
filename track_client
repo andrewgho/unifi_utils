@@ -1,0 +1,56 @@
+#!/bin/sh
+# track_client - track which UniFi managed AP a client is connected to
+# Andrew Ho (andrew@zeuscat.com)
+#
+# Given a client name, continuously poll the UniFi Cloud Key REST API to
+# find which AP that client is connected to, if any. Whenever the client
+# connects to a different AP, print the display name of that AP as well
+# as a timestamp for logging.
+#
+# Requires unifi_functions.sh and unifi_credentials.sh in your $PATH
+# as well as jq (https://stedolan.github.io/jq/) for working with JSON.
+
+ME=$(basename -- "$0")
+warn() { echo "$ME: $@" 1>&2; }
+die() { echo "$ME: $@" 1>&2; exit 1; }
+
+source unifi_functions.sh
+source unifi_credentials.sh
+
+CLIENT_NAME="$1"
+[ -z "$CLIENT_NAME" ] && die 'missing required client name argument'
+
+POLL_DELAY=5
+
+unifi_login "$UNIFI_BASEURL" "$UNIFI_USERNAME" "$UNIFI_PASSWORD"
+[ $? -eq 0 ] || die 'could not log in to UniFi Cloud Key'
+
+# Fetch AP MAC address for a given client
+ap_mac() {
+    unifi_fetch api/s/default/stat/sta |
+        jq -r --arg name "$1" '.data[] | select(.name == $name).ap_mac'
+}
+
+# Resolve AP MAC address to device name
+ap_name() {
+    unifi_fetch api/s/default/stat/device-basic |
+        jq -r --arg mac "$1" '.data[] | select(.mac == $mac).name'
+}
+
+# Poll for MAC address until it changes, then log timestamp and device name
+old_ap_mac=
+while true; do
+    new_ap_mac=$(ap_mac "$CLIENT_NAME")
+    if [ "x$old_ap_mac" = "x$new_ap_mac" ]; then
+        sleep "$POLL_DELAY"
+    else
+        old_ap_mac="$new_ap_mac"
+        if [ "x$new_ap_mac" = x ]; then
+            name='(disconnected)'
+        else
+            name=$(ap_name "$new_ap_mac")
+            [ -z "$name" ] && name='(unknown)'
+        fi
+        echo $(date +%Y-%m-%dT%H:%M:%S) "$name"
+    fi
+done
