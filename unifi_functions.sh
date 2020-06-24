@@ -73,7 +73,7 @@ unifi_login() {
     if [ -z "$ip" ]; then
         # Hostname did not resolve locally, ask gateway to resolve it
         local gateway
-        # TODO: macos doesn't ship with ip command, fall back to netstat -rn
+        # TODO: macOS doesn't ship with ip command, fall back to netstat -rn
         gateway=$(ip route | awk '/^default via/ { print $3 }')
         [ -z "$gateway" ] && warn 'could not determine default gateway' && return 1
         local ip
