@@ -49,7 +49,7 @@ while true; do
             name='(disconnected)'
         else
             name=$(ap_name "$new_ap_mac")
-            [ -z "$name" ] && name='(unknown)'
+            [ -z "$name" ] && name="($new_ap_mac)"
         fi
         echo $(date +%Y-%m-%dT%H:%M:%S) "$name"
     fi
