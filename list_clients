@@ -8,12 +8,12 @@
 # Requires unifi_functions.sh and unifi_credentials.sh in your $PATH
 # as well as jq (https://stedolan.github.io/jq/) for working with JSON.
 
-ME=$(basename -- "$0")
+ME=`basename -- "$0"`
 warn() { echo "$ME: $@" 1>&2; }
 die() { echo "$ME: $@" 1>&2; exit 1; }
 
-source unifi_functions.sh
-source unifi_credentials.sh
+. unifi_functions.sh
+. unifi_credentials.sh
 
 unifi_login "$UNIFI_BASEURL" "$UNIFI_USERNAME" "$UNIFI_PASSWORD"
 [ $? -eq 0 ] || die 'could not log in to UniFi Cloud Key'

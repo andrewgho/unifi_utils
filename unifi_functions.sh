@@ -20,8 +20,11 @@
 # https://ubntwiki.com/products/software/unifi-controller/api
 
 # Error reporting inherits or sets $ME and warn()
-(set | grep -q ^ME=) || ME=$(basename -- "$0")
-(declare -F warn > /dev/null) || warn() { echo "$ME: $@" 1>&2; }
+(set | grep '^ME=' > /dev/null) || ME=`basename -- "$0"`
+(set | grep '^warn \?()' > /dev/null) || warn() { echo "$ME: $@" 1>&2; }
+
+# For heirloom Bourne shell without local, make local a noop
+(type local | grep 'builtin$' > /dev/null) || local() { return 0; }
 
 # URL to UniFi Cloud Key without path, example: http://unifi-cloudkey-gen2:8443
 UNIFI_BASEURL=
@@ -63,25 +66,26 @@ unifi_login() {
     # Resolve hostname to IP address via default gateway if necessary
     # (for example, if this script runs on a server using a public DNS server)
     local hostport
-    hostport=$(echo "$UNIFI_BASEURL" | sed 's,^https\{0\,1\}://,,; s,^.*\@,,; s,/.*$,,')
+    # TODO: heirloom sed requires '\{0,1\}' (no backslash on comma) for single optional atom
+    hostport=`echo "$UNIFI_BASEURL" | sed 's,^https\{0\,1\}://,,; s,^.*\@,,; s,/.*$,,'`
     [ -z "$hostport" ] && warn 'could not extract host:port from URL: $UNIFI_BASEURL' && return 1
     local hostname
-    hostname=$(echo "$hostport" | sed 's/:[1-9][0-9]*$//')
+    hostname=`echo "$hostport" | sed 's/:[1-9][0-9]*$//'`
     [ -z "$hostname" ] && warn 'could not extract hostname from URL: $UNIFI_BASEURL' && return 1
     local ip
-    ip=$(dig +short "$hostname")
+    ip=`dig +short "$hostname"`
     if [ -z "$ip" ]; then
         # Hostname did not resolve locally, ask gateway to resolve it
         local gateway
         # TODO: macOS doesn't ship with ip command, fall back to netstat -rn
-        gateway=$(ip route | awk '/^default via/ { print $3 }')
+        gateway=`ip route | awk '/^default via/ { print $3 }'`
         [ -z "$gateway" ] && warn 'could not determine default gateway' && return 1
         local ip
-        ip=$(dig +short "@$gateway" "$hostname." "$hostname.localdomain." | tail -1)
+        ip=`dig +short "@$gateway" "$hostname." "$hostname.localdomain." | tail -1`
         [ -z "$ip" ] && warn "could not resolve short hostname: $hostname" && return 1
         # TODO: make sed command safer
-        UNIFI_BASEURL_RESOLVED=$(echo "$UNIFI_BASEURL" |
-                                     sed "s,^\\(https\\?://\\)$hostname,\\1$ip,")
+        UNIFI_BASEURL_RESOLVED=`echo "$UNIFI_BASEURL" |
+                                     sed "s,^\\(https\\?://\\)$hostname,\\1$ip,"`
     else
         # Hostname resolved fine locally, so just use it as is
         UNIFI_BASEURL_RESOLVED="$UNIFI_BASEURL"
@@ -89,11 +93,10 @@ unifi_login() {
 
     local postbody
     postbody="{\"username\":\"$username\",\"password\":\"$password\"}"
-    UNIFI_COOKIES=$(curl -iks -d "$postbody" "$UNIFI_BASEURL_RESOLVED/api/login" |
+    UNIFI_COOKIES=`curl -iks -d "$postbody" "$UNIFI_BASEURL_RESOLVED/api/login" |
                         sed -n 's/^Set-Cookie: //p' |
                         sed 's/;.*$//' |
-                        xargs echo |
-                        tr ' ' ';')
+                        paste -sd ';' -`
 }
 
 unifi_fetch() {
@@ -103,7 +106,7 @@ unifi_fetch() {
     endpoint="$1"
     [ -z "$endpoint" ] && warn 'missing required API endpoint path argument' && return 1
     # Chop optional leading slash (allow both /status and status)
-    endpoint=$(echo "$endpoint" | sed 's,^/,,')
+    endpoint=`echo "$endpoint" | sed 's,^/,,'`
 
     curl -ks -b "$UNIFI_COOKIES" "$UNIFI_BASEURL_RESOLVED/$endpoint"
 }
